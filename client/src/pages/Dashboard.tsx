@@ -1,11 +1,13 @@
 import React from 'react';
 import { Users, Building2, Globe, AppWindow, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import DataCard from '@/components/DataCard';
-import { mockData } from '@/lib/mockData';
+import { useData } from '@/contexts/DataContext';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
+import { useLocation } from 'wouter';
 
 const Dashboard = () => {
-  const { people, departments, websites, applications } = mockData;
+  const { people, departments, websites, applications } = useData();
+  const [, setLocation] = useLocation();
 
   // Calculate metrics
   const totalPeople = people.length;
@@ -17,10 +19,10 @@ const Dashboard = () => {
   const pendingReviews = websites.filter(w => !w.manualReview).length;
 
   const chartData = [
-    { name: 'People', value: totalPeople, color: 'var(--chart-1)' },
-    { name: 'Depts', value: totalDepartments, color: 'var(--chart-2)' },
-    { name: 'Websites', value: totalWebsites, color: 'var(--chart-3)' },
-    { name: 'Apps', value: totalApps, color: 'var(--chart-4)' },
+    { name: 'People', value: totalPeople, color: '#3b82f6' }, // Blue-500
+    { name: 'Depts', value: totalDepartments, color: '#f97316' }, // Orange-500
+    { name: 'Websites', value: totalWebsites, color: '#10b981' }, // Emerald-500
+    { name: 'Apps', value: totalApps, color: '#8b5cf6' }, // Violet-500
   ];
 
   return (
@@ -38,12 +40,16 @@ const Dashboard = () => {
           icon={Users}
           trend={{ value: 12, isPositive: true }}
           description="Active personnel"
+          color="text-blue-500"
+          onClick={() => setLocation('/people')}
         />
         <DataCard 
           title="Departments" 
           value={totalDepartments} 
           icon={Building2}
           description="Across organization"
+          color="text-orange-500"
+          onClick={() => setLocation('/departments')}
         />
         <DataCard 
           title="Websites" 
@@ -51,12 +57,16 @@ const Dashboard = () => {
           icon={Globe}
           trend={{ value: 2, isPositive: true }}
           description="Public & Internal"
+          color="text-emerald-500"
+          onClick={() => setLocation('/websites')}
         />
         <DataCard 
           title="Applications" 
           value={totalApps} 
           icon={AppWindow}
           description="Managed software"
+          color="text-violet-500"
+          onClick={() => setLocation('/applications')}
         />
       </div>
 
@@ -106,7 +116,7 @@ const Dashboard = () => {
           <div className="glass-panel rounded-xl p-6 h-full">
             <h3 className="font-semibold text-lg mb-4">Compliance Status</h3>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-lg cursor-pointer hover:bg-red-500/20 transition-colors" onClick={() => setLocation('/websites')}>
                 <div className="flex items-center gap-3">
                   <AlertCircle className="h-5 w-5 text-red-500" />
                   <div>
@@ -117,7 +127,7 @@ const Dashboard = () => {
                 <span className="font-bold text-red-600">{accessibilityIssues}</span>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg cursor-pointer hover:bg-yellow-500/20 transition-colors" onClick={() => setLocation('/websites')}>
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-yellow-600" />
                   <div>
