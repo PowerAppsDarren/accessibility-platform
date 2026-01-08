@@ -1,28 +1,96 @@
-import React from 'react';
-import { DataTable } from '@/components/DataTable';
-import { mockData } from '@/lib/mockData';
+import React, { useState } from 'react';
+import { useData } from '@/contexts/DataContext';
 import { Application } from '@/types/schema';
-import { Badge } from '@/components/ui/badge';
+import { DataTable } from '@/components/DataTable';
+import RecordDialog from '@/components/RecordDialog';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Search, ExternalLink, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
 const Applications = () => {
+  const { applications, departments, addApplication, updateApplication, deleteApplication } = useData();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentApplication, setCurrentApplication] = useState<Partial<Application>>({});
+  const [isEditing, setIsEditing] = useState(false);
+
+  const filteredApplications = applications.filter(app => 
+    (app.url || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (app.contactName || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleAdd = () => {
+    setCurrentApplication({
+      url: '',
+      contactName: '',
+      departmentId: departments[0]?.id,
+      lastContactDate: new Date().toISOString().split('T')[0],
+      vpatOrAcr: false
+    });
+    setIsEditing(false);
+    setIsDialogOpen(true);
+  };
+
+  const handleEdit = (app: Application) => {
+    setCurrentApplication({ ...app });
+    setIsEditing(true);
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!currentApplication.url || !currentApplication.departmentId) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (isEditing && currentApplication.id) {
+      updateApplication(currentApplication.id, currentApplication);
+      toast.success('Application updated successfully');
+    } else {
+      addApplication(currentApplication as Omit<Application, 'id'>);
+      toast.success('Application added successfully');
+    }
+    setIsDialogOpen(false);
+  };
+
+  const handleDelete = () => {
+    if (currentApplication.id) {
+      deleteApplication(currentApplication.id);
+      toast.success('Application deleted successfully');
+      setIsDialogOpen(false);
+    }
+  };
+
   const columns = [
     { header: 'ID', accessorKey: 'id' as keyof Application, className: 'w-[60px]' },
     { 
-      header: 'Application', 
+      header: 'URL', 
       cell: (app: Application) => (
-        <div className="font-medium text-foreground">{app.url?.replace('https://', '').split('/')[0] || 'Unknown App'}</div>
+        <a 
+          href={app.url} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="flex items-center gap-2 text-primary hover:underline font-medium"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {app.url?.replace('https://', '')}
+          <ExternalLink className="h-3 w-3 opacity-50" />
+        </a>
       )
     },
-    { header: 'Contact', accessorKey: 'contactName' as keyof Application },
     { 
       header: 'Department', 
       cell: (app: Application) => {
-        const dept = mockData.departments.find(d => d.id === app.departmentId);
-        return <span className="text-muted-foreground">{dept?.name || '-'}</span>;
+        const dept = departments.find(d => d.id === app.departmentId);
+        return dept?.name || 'Unknown';
       }
     },
+    { header: 'Contact', accessorKey: 'contactName' as keyof Application },
     { 
       header: 'VPAT/ACR', 
       cell: (app: Application) => (
@@ -36,33 +104,124 @@ const Applications = () => {
       )
     },
     { header: 'Last Contact', accessorKey: 'lastContactDate' as keyof Application },
-    { 
-      header: 'Notes', 
-      cell: (app: Application) => (
-        <span className="text-xs text-muted-foreground truncate max-w-[200px] block" title={app.notes}>
-          {app.notes || '-'}
-        </span>
-      )
-    },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary">Applications</h2>
-          <p className="text-muted-foreground mt-1">Software inventory and VPAT status tracking.</p>
+          <p className="text-muted-foreground mt-1">Manage software applications and vendor compliance.</p>
         </div>
-        <Button className="bg-accent hover:bg-accent/90 text-white shadow-lg shadow-accent/20">
-          <Plus className="mr-2 h-4 w-4" /> Add Application
+        <Button onClick={handleAdd} className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Application
         </Button>
       </div>
 
+      <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm p-2 rounded-lg border border-white/20 shadow-sm max-w-md">
+        <Search className="h-4 w-4 text-muted-foreground ml-2" />
+        <input 
+          type="text"
+          placeholder="Search applications..."
+          className="bg-transparent border-none focus:outline-none text-sm w-full"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
       <DataTable 
-        data={mockData.applications} 
-        columns={columns} 
-        className="shadow-xl"
+        data={filteredApplications}
+        columns={columns}
+        onRowClick={handleEdit}
       />
+
+      <RecordDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        title={isEditing ? "Edit Application" : "Add Application"}
+        description={isEditing ? "Update application details." : "Add a new application to the system."}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        isEditing={isEditing}
+      >
+        <div className="grid gap-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="url">URL *</Label>
+            <Input 
+              id="url" 
+              value={currentApplication.url || ''} 
+              onChange={(e) => setCurrentApplication({...currentApplication, url: e.target.value})}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="department">Department *</Label>
+              <Select 
+                value={currentApplication.departmentId?.toString()} 
+                onValueChange={(val) => setCurrentApplication({...currentApplication, departmentId: parseInt(val)})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map(dept => (
+                    <SelectItem key={dept.id} value={dept.id.toString()}>{dept.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact">Contact Name</Label>
+              <Input 
+                id="contact" 
+                value={currentApplication.contactName || ''} 
+                onChange={(e) => setCurrentApplication({...currentApplication, contactName: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="vendor">Vendor ID</Label>
+              <Input 
+                id="vendor" 
+                type="number"
+                value={currentApplication.vendorId || ''} 
+                onChange={(e) => setCurrentApplication({...currentApplication, vendorId: parseInt(e.target.value)})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastContact">Last Contact Date</Label>
+              <Input 
+                id="lastContact" 
+                type="date"
+                value={currentApplication.lastContactDate || ''} 
+                onChange={(e) => setCurrentApplication({...currentApplication, lastContactDate: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-2 border rounded-lg">
+            <Label htmlFor="vpat" className="cursor-pointer">VPAT or ACR Available</Label>
+            <Switch 
+              id="vpat" 
+              checked={currentApplication.vpatOrAcr}
+              onCheckedChange={(checked) => setCurrentApplication({...currentApplication, vpatOrAcr: checked})}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Input 
+              id="notes" 
+              value={currentApplication.notes || ''} 
+              onChange={(e) => setCurrentApplication({...currentApplication, notes: e.target.value})}
+            />
+          </div>
+        </div>
+      </RecordDialog>
     </div>
   );
 };
