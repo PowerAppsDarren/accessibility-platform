@@ -12,6 +12,7 @@ import People from "./pages/People";
 import Departments from "./pages/Departments";
 import Websites from "./pages/Websites";
 import Applications from "./pages/Applications";
+import Settings from "./pages/Settings";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/departments" component={Departments} />
         <Route path="/websites" component={Websites} />
         <Route path="/applications" component={Applications} />
+        <Route path="/settings" component={Settings} />
         <Route path="/404" component={NotFound} />
         {/* Final fallback route */}
         <Route component={NotFound} />
@@ -33,7 +35,7 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="light" switchable={true}>
         <TooltipProvider>
           <Toaster />
           <Router />

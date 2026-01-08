@@ -1,202 +1,96 @@
 import { Person, Department, Website, Application, MockData } from '../types/schema';
 
-export const mockPeople: Person[] = [
-  {
-    id: 1,
-    firstName: 'John',
-    lastName: 'Doe',
-    departmentId: 101,
-    managerId: 2,
-    lastContactDate: '2025-12-01',
-    champion: 'Yes',
-    levelAccessAccount: 'Complete',
-    notes: 'Primary contact for IT accessibility.'
-  },
-  {
-    id: 2,
-    firstName: 'Jane',
-    lastName: 'Smith',
-    departmentId: 101,
-    lastContactDate: '2025-11-15',
-    champion: 'In Progress',
-    levelAccessAccount: 'In Progress',
-    notes: 'Oversees departmental compliance.'
-  },
-  {
-    id: 3,
-    firstName: 'Robert',
-    lastName: 'Johnson',
-    departmentId: 102,
-    managerId: 4,
-    lastContactDate: '2025-10-20',
-    champion: 'No',
-    levelAccessAccount: 'No',
-    notes: 'Needs training on accessibility tools.'
-  },
-  {
-    id: 4,
-    firstName: 'Emily',
-    lastName: 'Davis',
-    departmentId: 102,
-    lastContactDate: '2025-12-05',
-    champion: 'Yes',
-    levelAccessAccount: 'Complete',
-    notes: 'Department head for HR.'
-  },
-  {
-    id: 5,
-    firstName: 'Michael',
-    lastName: 'Brown',
-    departmentId: 103,
-    managerId: 6,
-    lastContactDate: '2025-09-10',
-    champion: 'In Progress',
-    levelAccessAccount: 'Troubleshooting',
-    notes: 'Experiencing login issues with Level Access.'
-  },
-  {
-    id: 6,
-    firstName: 'Sarah',
-    lastName: 'Wilson',
-    departmentId: 103,
-    lastContactDate: '2025-11-30',
-    champion: 'Yes',
-    levelAccessAccount: 'Complete',
-    notes: 'Research lead.'
-  }
+// Helper to generate random dates
+const randomDate = (start: Date, end: Date) => {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime())).toISOString().split('T')[0];
+};
+
+// Helper to pick random item from array
+const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const firstNames = ['James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda', 'William', 'Elizabeth', 'David', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica', 'Thomas', 'Sarah', 'Charles', 'Karen', 'Christopher', 'Nancy', 'Daniel', 'Lisa', 'Matthew', 'Margaret', 'Anthony', 'Betty', 'Donald', 'Sandra', 'Mark', 'Ashley', 'Paul', 'Dorothy', 'Steven', 'Kimberly', 'Andrew', 'Emily', 'Kenneth', 'Donna', 'Joshua', 'Michelle', 'Kevin', 'Carol', 'Brian', 'Amanda', 'George', 'Melissa', 'Edward', 'Deborah'];
+const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin', 'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson', 'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores', 'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter', 'Roberts'];
+
+const departmentNames = [
+  'Information Technology', 'Human Resources', 'Research & Development', 'Clinical Operations', 'Finance', 
+  'Marketing & Communications', 'Facilities Management', 'Legal Affairs', 'Academic Affairs', 'Student Services',
+  'Pathology', 'Radiology', 'Surgery', 'Pediatrics', 'Internal Medicine', 'Neurology', 'Oncology', 
+  'Emergency Medicine', 'Pharmacy', 'Nursing Administration', 'Health Information Management', 'Biomedical Engineering',
+  'Compliance & Audit', 'Patient Experience', 'Telemedicine'
 ];
 
-export const mockDepartments: Department[] = [
-  {
-    id: 101,
-    name: 'Information Technology',
-    headId: 2,
-    managerId: 2,
-    lastContactDate: '2025-12-10',
-    championId: 1,
-    websiteIds: [1, 2],
-    applicationIds: [1],
-    notes: 'Core infrastructure team.'
-  },
-  {
-    id: 102,
-    name: 'Human Resources',
-    headId: 4,
-    managerId: 4,
-    lastContactDate: '2025-12-08',
-    championId: 4,
-    websiteIds: [3],
-    applicationIds: [2],
-    notes: 'Employee relations and benefits.'
-  },
-  {
-    id: 103,
-    name: 'Research & Development',
-    headId: 6,
-    managerId: 6,
-    lastContactDate: '2025-11-25',
-    championId: 6,
-    websiteIds: [4],
-    applicationIds: [3],
-    notes: 'Clinical trials and academic research.'
-  }
-];
+// Generate 50 People
+export const mockPeople: Person[] = Array.from({ length: 50 }, (_, i) => ({
+  id: i + 1,
+  firstName: pick(firstNames),
+  lastName: pick(lastNames),
+  departmentId: Math.floor(Math.random() * 25) + 100, // IDs 100-124
+  managerId: Math.random() > 0.8 ? undefined : Math.floor(Math.random() * 50) + 1,
+  lastContactDate: randomDate(new Date(2024, 0, 1), new Date(2025, 12, 31)),
+  champion: pick(['No', 'In Progress', 'Yes', 'No', 'No']),
+  levelAccessAccount: pick(['No', 'In Progress', 'On hold', 'Troubleshooting', 'Complete', 'Complete', 'No']),
+  notes: Math.random() > 0.7 ? 'Generated mock person note.' : undefined
+}));
 
-export const mockWebsites: Website[] = [
-  {
-    id: 1,
-    departmentId: 101,
-    contactId: 1,
-    managerId: 2,
-    lastContactDate: '2025-12-12',
-    owner: 'IT Dept',
-    url: 'https://it.utmb.edu',
-    archived: false,
-    accessibilityReviewed: true,
-    siteimproveScore: 95,
-    manualReview: true,
-    remediationPlan: 'Minor contrast fixes pending.',
-    notes: 'Main IT portal.'
-  },
-  {
-    id: 2,
-    departmentId: 101,
-    contactId: 1,
-    managerId: 2,
-    lastContactDate: '2025-11-01',
-    owner: 'IT Dept',
-    url: 'https://helpdesk.utmb.edu',
-    archived: false,
-    accessibilityReviewed: true,
-    siteimproveScore: 88,
-    manualReview: false,
-    remediationPlan: 'Scheduled for Q1 2026.',
-    notes: 'Support ticketing system.'
-  },
-  {
-    id: 3,
-    departmentId: 102,
-    contactId: 4,
-    managerId: 4,
-    lastContactDate: '2025-12-05',
-    owner: 'HR Dept',
-    url: 'https://hr.utmb.edu',
-    archived: false,
-    accessibilityReviewed: false,
-    siteimproveScore: 72,
-    manualReview: false,
-    remediationPlan: 'Needs comprehensive audit.',
-    notes: 'Employee handbook and benefits.'
-  },
-  {
-    id: 4,
-    departmentId: 103,
-    contactId: 6,
-    managerId: 6,
-    lastContactDate: '2025-10-15',
-    owner: 'Research Dept',
-    url: 'https://research.utmb.edu',
-    archived: false,
-    accessibilityReviewed: true,
-    siteimproveScore: 91,
-    manualReview: true,
-    remediationPlan: 'Complete.',
-    notes: 'Public research publications.'
-  }
-];
+// Generate 25 Departments
+export const mockDepartments: Department[] = departmentNames.map((name, i) => ({
+  id: 100 + i,
+  name: name,
+  headId: Math.floor(Math.random() * 50) + 1,
+  managerId: Math.floor(Math.random() * 50) + 1,
+  lastContactDate: randomDate(new Date(2025, 0, 1), new Date(2025, 12, 31)),
+  championId: Math.random() > 0.5 ? Math.floor(Math.random() * 50) + 1 : undefined,
+  websiteIds: [], // Will populate after websites are created
+  applicationIds: [], // Will populate after apps are created
+  notes: `Department of ${name}`
+}));
 
-export const mockApplications: Application[] = [
-  {
-    id: 1,
-    departmentId: 101,
-    contactName: 'John Doe',
-    vendorId: 501,
-    lastContactDate: '2025-12-01',
-    vpatOrAcr: true,
-    url: 'https://app.it-tools.com',
-    notes: 'Network monitoring tool.'
-  },
-  {
-    id: 2,
-    departmentId: 102,
-    contactName: 'Emily Davis',
-    vendorId: 502,
-    lastContactDate: '2025-11-20',
-    vpatOrAcr: false,
-    url: 'https://payroll.hr-systems.com',
-    notes: 'Payroll processing. Vendor promised VPAT by Jan 2026.'
-  },
-  {
-    id: 3,
-    departmentId: 103,
-    contactName: 'Sarah Wilson',
-    vendorId: 503,
-    lastContactDate: '2025-10-30',
-    vpatOrAcr: true,
-    url: 'https://lab-manager.science-tech.com',
-    notes: 'Lab inventory management.'
-  }
-];
+// Generate 60 Websites
+export const mockWebsites: Website[] = Array.from({ length: 60 }, (_, i) => {
+  const deptId = 100 + Math.floor(Math.random() * 25);
+  const site = {
+    id: i + 1,
+    departmentId: deptId,
+    contactId: Math.floor(Math.random() * 50) + 1,
+    managerId: Math.floor(Math.random() * 50) + 1,
+    lastContactDate: randomDate(new Date(2025, 5, 1), new Date(2025, 12, 31)),
+    owner: `${pick(firstNames)} ${pick(lastNames)}`,
+    url: `https://${pick(['www', 'portal', 'intranet', 'secure', 'app', 'docs'])}.utmb.edu/${pick(['hr', 'it', 'research', 'clinical', 'patient', 'staff'])}/${i}`,
+    archived: Math.random() > 0.9,
+    accessibilityReviewed: Math.random() > 0.4,
+    siteimproveScore: Math.floor(Math.random() * 40) + 60, // 60-100
+    manualReview: Math.random() > 0.7,
+    remediationPlan: Math.random() > 0.6 ? 'Pending audit review' : undefined,
+    notes: Math.random() > 0.8 ? 'Legacy site, needs migration' : undefined
+  };
+  
+  // Link back to department
+  const dept = mockDepartments.find(d => d.id === deptId);
+  if (dept) dept.websiteIds.push(site.id);
+  
+  return site;
+});
+
+// Generate 40 Applications
+export const mockApplications: Application[] = Array.from({ length: 40 }, (_, i) => {
+  const deptId = 100 + Math.floor(Math.random() * 25);
+  const app = {
+    id: i + 1,
+    departmentId: deptId,
+    contactName: `${pick(firstNames)} ${pick(lastNames)}`,
+    vendorId: 500 + i,
+    lastContactDate: randomDate(new Date(2025, 3, 1), new Date(2025, 12, 31)),
+    vpatOrAcr: Math.random() > 0.3,
+    url: `https://${pick(['app', 'cloud', 'saas', 'system'])}.vendor${i}.com`,
+    notes: Math.random() > 0.5 ? 'Vendor contract renewal in 2026' : undefined
+  };
+
+  // Link back to department
+  const dept = mockDepartments.find(d => d.id === deptId);
+  if (dept) dept.applicationIds.push(app.id);
+
+  return app;
+});
 
 export const mockData: MockData = {
   people: mockPeople,
