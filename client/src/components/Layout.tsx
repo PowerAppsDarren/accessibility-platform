@@ -69,30 +69,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {navItems.map((item) => {
             const isActive = location === item.href;
             return (
-              <Link key={item.href} href={item.href}>
-                <a 
-                  className={cn(
+              <Link key={item.href} href={item.href} className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 group",
                     isActive 
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md" 
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
+                  onClick={() => setIsMobileMenuOpen(false)}>
                   <item.icon className={cn("h-5 w-5", isActive ? "text-white" : "text-sidebar-foreground/70 group-hover:text-sidebar-accent-foreground")} />
                   {item.label}
-                </a>
               </Link>
             );
           })}
         </nav>
 
         <div className="p-4 border-t border-sidebar-border/50 space-y-1">
-          <Link href="/settings">
-            <a className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
+          <Link href="/settings" className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
               <Settings className="h-5 w-5 text-sidebar-foreground/70" />
               Settings
-            </a>
           </Link>
           <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
             <LogOut className="h-5 w-5" />
