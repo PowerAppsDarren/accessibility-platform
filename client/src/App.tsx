@@ -14,8 +14,8 @@ import Departments from "./pages/Departments";
 import Websites from "./pages/Websites";
 import Applications from "./pages/Applications";
 import Settings from "./pages/Settings";
-
 function Router() {
+  // make sure to consider if you need authentication for certain routes
   return (
     <Layout>
       <Switch>

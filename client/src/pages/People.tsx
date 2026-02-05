@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
-import { useData } from '@/contexts/DataContext';
-import { Person } from '@/types/schema';
+import { useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Person } from '../../../drizzle/schema';
+
+type PersonForm = Omit<Person, 'lastContactDate' | 'createdAt' | 'updatedAt'> & {
+  lastContactDate?: string;
+};
 import { DataTable } from '@/components/DataTable';
 import RecordDialog from '@/components/RecordDialog';
 import { Button } from '@/components/ui/button';
@@ -12,10 +16,15 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
 const People = () => {
-  const { people, departments, addPerson, updatePerson, deletePerson } = useData();
+  const { data: people = [], isLoading: peopleLoading, refetch: refetchPeople } = trpc.people.list.useQuery();
+  const { data: departments = [] } = trpc.departments.list.useQuery();
+  const createPerson = trpc.people.create.useMutation();
+  const updatePersonMutation = trpc.people.update.useMutation();
+  const deletePersonMutation = trpc.people.delete.useMutation();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentPerson, setCurrentPerson] = useState<Partial<Person>>({});
+  const [currentPerson, setCurrentPerson] = useState<Partial<PersonForm>>({});
   const [isEditing, setIsEditing] = useState(false);
 
   const filteredPeople = people.filter(person => 
@@ -38,54 +47,77 @@ const People = () => {
   };
 
   const handleEdit = (person: Person) => {
-    setCurrentPerson({ ...person });
+    const formPerson: Partial<PersonForm> = {
+      ...person,
+      lastContactDate: person.lastContactDate ? new Date(person.lastContactDate).toISOString().split('T')[0] : undefined
+    };
+    setCurrentPerson(formPerson);
     setIsEditing(true);
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!currentPerson.firstName || !currentPerson.lastName || !currentPerson.departmentId) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    if (isEditing && currentPerson.id) {
-      updatePerson(currentPerson.id, currentPerson);
-      toast.success('Person updated successfully');
-    } else {
-      addPerson(currentPerson as Omit<Person, 'id'>);
-      toast.success('Person added successfully');
+    try {
+      if (isEditing && currentPerson.id) {
+        await updatePersonMutation.mutateAsync({
+          id: currentPerson.id,
+          firstName: currentPerson.firstName,
+          lastName: currentPerson.lastName,
+          departmentId: currentPerson.departmentId,
+          champion: currentPerson.champion as "No" | "In Progress" | "Yes",
+          levelAccessAccount: currentPerson.levelAccessAccount as "No" | "In Progress" | "On hold" | "Troubleshooting" | "Complete",
+          lastContactDate: currentPerson.lastContactDate || undefined,
+          notes: currentPerson.notes || undefined
+        });
+        toast.success('Person updated successfully');
+      } else {
+        await createPerson.mutateAsync({
+          firstName: currentPerson.firstName,
+          lastName: currentPerson.lastName,
+          departmentId: currentPerson.departmentId,
+          champion: currentPerson.champion as "No" | "In Progress" | "Yes",
+          levelAccessAccount: currentPerson.levelAccessAccount as "No" | "In Progress" | "On hold" | "Troubleshooting" | "Complete",
+          lastContactDate: currentPerson.lastContactDate || undefined,
+          notes: currentPerson.notes || undefined
+        });
+        toast.success('Person added successfully');
+      }
+      refetchPeople();
+      setIsDialogOpen(false);
+    } catch (error) {
+      toast.error('Failed to save person');
+      console.error(error);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
-    if (currentPerson.id) {
-      deletePerson(currentPerson.id);
+  const handleDelete = async () => {
+    if (!currentPerson.id) return;
+
+    try {
+      await deletePersonMutation.mutateAsync({ id: currentPerson.id });
       toast.success('Person deleted successfully');
+      refetchPeople();
       setIsDialogOpen(false);
+    } catch (error) {
+      toast.error('Failed to delete person');
+      console.error(error);
     }
   };
 
   const columns = [
-    { header: 'ID', accessorKey: 'id' as keyof Person, className: 'w-[80px]' },
+    { header: 'First Name', accessorKey: 'firstName' as const },
+    { header: 'Last Name', accessorKey: 'lastName' as const },
     { 
-      header: 'Name', 
-      cell: (person: Person) => (
-        <div className="flex flex-col">
-          <span className="font-medium text-foreground">{person.firstName} {person.lastName}</span>
-        </div>
-      )
+      header: 'Department',
+      cell: (person: Person) => departments.find(d => d.id === person.departmentId)?.name || 'N/A'
     },
     { 
-      header: 'Department', 
-      cell: (person: Person) => {
-        const dept = departments.find(d => d.id === person.departmentId);
-        return <span className="text-muted-foreground">{dept?.name || 'Unknown'}</span>;
-      }
-    },
-    { 
-      header: 'Champion', 
+      header: 'Champion',
       cell: (person: Person) => (
         <Badge variant={person.champion === 'Yes' ? 'default' : person.champion === 'In Progress' ? 'secondary' : 'outline'}>
           {person.champion}
@@ -93,46 +125,47 @@ const People = () => {
       )
     },
     { 
-      header: 'Level Access', 
+      header: 'Level Access',
       cell: (person: Person) => (
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${
-            person.levelAccessAccount === 'Complete' ? 'bg-green-500' : 
-            person.levelAccessAccount === 'Troubleshooting' ? 'bg-red-500' : 
-            'bg-yellow-500'
-          }`} />
-          <span>{person.levelAccessAccount}</span>
-        </div>
+        <Badge variant={person.levelAccessAccount === 'Complete' ? 'default' : person.levelAccessAccount === 'In Progress' ? 'secondary' : 'outline'}>
+          {person.levelAccessAccount}
+        </Badge>
       )
     },
-    { header: 'Last Contact', accessorKey: 'lastContactDate' as keyof Person },
+    { 
+      header: 'Last Contact',
+      cell: (person: Person) => person.lastContactDate ? new Date(person.lastContactDate).toLocaleDateString() : 'N/A'
+    }
   ];
+
+  if (peopleLoading) {
+    return <div className="p-6">Loading...</div>;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-primary">People</h2>
-          <p className="text-muted-foreground mt-1">Manage personnel and their access levels.</p>
+          <h1 className="text-3xl font-bold text-foreground">People</h1>
+          <p className="text-muted-foreground">Manage personnel and their accessibility roles.</p>
         </div>
-        <Button onClick={handleAdd} className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
-          <Plus className="h-4 w-4 mr-2" />
+        <Button onClick={handleAdd} className="gap-2">
+          <Plus className="h-4 w-4" />
           Add Person
         </Button>
       </div>
 
-      <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm p-2 rounded-lg border border-white/20 shadow-sm max-w-md">
-        <Search className="h-4 w-4 text-muted-foreground ml-2" />
-        <input 
-          type="text"
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
           placeholder="Search people..."
-          className="bg-transparent border-none focus:outline-none text-sm w-full"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
         />
       </div>
 
-      <DataTable 
+      <DataTable
         data={filteredPeople}
         columns={columns}
         onRowClick={handleEdit}
@@ -141,102 +174,95 @@ const People = () => {
       <RecordDialog
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        title={isEditing ? "Edit Person" : "Add Person"}
-        description={isEditing ? "Update personnel details." : "Add a new person to the system."}
         onSave={handleSave}
-        onDelete={handleDelete}
+        onDelete={isEditing ? handleDelete : undefined}
+        title={isEditing ? 'Edit Person' : 'Add Person'}
         isEditing={isEditing}
       >
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input 
-                id="firstName" 
-                value={currentPerson.firstName || ''} 
-                onChange={(e) => setCurrentPerson({...currentPerson, firstName: e.target.value})}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name *</Label>
-              <Input 
-                id="lastName" 
-                value={currentPerson.lastName || ''} 
-                onChange={(e) => setCurrentPerson({...currentPerson, lastName: e.target.value})}
-              />
-            </div>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="firstName">First Name *</Label>
+            <Input
+              id="firstName"
+              value={currentPerson.firstName || ''}
+              onChange={(e) => setCurrentPerson({ ...currentPerson, firstName: e.target.value })}
+            />
           </div>
-
-          <div className="space-y-2">
+          <div>
+            <Label htmlFor="lastName">Last Name *</Label>
+            <Input
+              id="lastName"
+              value={currentPerson.lastName || ''}
+              onChange={(e) => setCurrentPerson({ ...currentPerson, lastName: e.target.value })}
+            />
+          </div>
+          <div>
             <Label htmlFor="department">Department *</Label>
-            <Select 
-              value={currentPerson.departmentId?.toString()} 
-              onValueChange={(val) => setCurrentPerson({...currentPerson, departmentId: parseInt(val)})}
+            <Select
+              value={currentPerson.departmentId?.toString()}
+              onValueChange={(value) => setCurrentPerson({ ...currentPerson, departmentId: parseInt(value) })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {departments.map(dept => (
-                  <SelectItem key={dept.id} value={dept.id.toString()}>{dept.name}</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.id.toString()}>
+                    {dept.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="champion">Champion</Label>
-              <Select 
-                value={currentPerson.champion} 
-                onValueChange={(val) => setCurrentPerson({...currentPerson, champion: val as any})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="levelAccess">Level Access Account</Label>
-              <Select 
-                value={currentPerson.levelAccessAccount} 
-                onValueChange={(val) => setCurrentPerson({...currentPerson, levelAccessAccount: val as any})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="No">No</SelectItem>
-                  <SelectItem value="In Progress">In Progress</SelectItem>
-                  <SelectItem value="On hold">On hold</SelectItem>
-                  <SelectItem value="Troubleshooting">Troubleshooting</SelectItem>
-                  <SelectItem value="Complete">Complete</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label htmlFor="champion">Champion Status</Label>
+            <Select
+              value={currentPerson.champion || 'No'}
+              onValueChange={(value) => setCurrentPerson({ ...currentPerson, champion: value as "No" | "In Progress" | "Yes" })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="No">No</SelectItem>
+                <SelectItem value="In Progress">In Progress</SelectItem>
+                <SelectItem value="Yes">Yes</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="lastContact">Last Contact Date</Label>
-            <Input 
-              id="lastContact" 
+          <div>
+            <Label htmlFor="levelAccessAccount">Level Access Account</Label>
+            <Select
+              value={currentPerson.levelAccessAccount || 'No'}
+              onValueChange={(value) => setCurrentPerson({ ...currentPerson, levelAccessAccount: value as "No" | "In Progress" | "On hold" | "Troubleshooting" | "Complete" })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="No">No</SelectItem>
+                <SelectItem value="In Progress">In Progress</SelectItem>
+                <SelectItem value="On hold">On hold</SelectItem>
+                <SelectItem value="Troubleshooting">Troubleshooting</SelectItem>
+                <SelectItem value="Complete">Complete</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="lastContactDate">Last Contact Date</Label>
+            <Input
+              id="lastContactDate"
               type="date"
-              value={currentPerson.lastContactDate || ''} 
-              onChange={(e) => setCurrentPerson({...currentPerson, lastContactDate: e.target.value})}
+              value={currentPerson.lastContactDate || ''}
+              onChange={(e) => setCurrentPerson({ ...currentPerson, lastContactDate: e.target.value })}
             />
           </div>
-
-          <div className="space-y-2">
+          <div>
             <Label htmlFor="notes">Notes</Label>
-            <Input 
-              id="notes" 
-              value={currentPerson.notes || ''} 
-              onChange={(e) => setCurrentPerson({...currentPerson, notes: e.target.value})}
+            <Input
+              id="notes"
+              value={currentPerson.notes || ''}
+              onChange={(e) => setCurrentPerson({ ...currentPerson, notes: e.target.value })}
             />
           </div>
         </div>
