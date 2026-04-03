@@ -9,14 +9,16 @@
 
 ## Frontend API Integration
 - [x] Update People page to use tRPC
-- [ ] Update Departments page to use tRPC
-- [ ] Update Websites page to use tRPC
-- [ ] Update Applications page to use tRPC
-- [ ] Update Dashboard to use tRPC
-- [ ] Remove DataContext (no longer needed)
+- [x] Update Departments page to use tRPC
+- [x] Update Websites page to use tRPC
+- [x] Update Applications page to use tRPC
+- [x] Update Dashboard to use tRPC
+- [x] Remove DataContext (no longer needed)
 
 ## Testing & Verification
-- [ ] Test CRUD operations on all pages
-- [ ] Verify data persistence across page refreshes
-- [ ] Test authentication flow
-- [ ] Save final checkpoint
+- [x] TypeScript compiles with zero errors
+- [x] Vite build succeeds
+- [ ] Test CRUD operations on all pages (needs running database)
+- [ ] Verify data persistence across page refreshes (needs running database)
+- [ ] Test authentication flow (needs running server)
+- [x] Save final checkpoint

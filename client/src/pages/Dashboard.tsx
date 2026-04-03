@@ -1,12 +1,15 @@
 import React from 'react';
 import { Users, Building2, Globe, AppWindow, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import DataCard from '@/components/DataCard';
-import { useData } from '@/contexts/DataContext';
+import { trpc } from '@/lib/trpc';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { useLocation } from 'wouter';
 
 const Dashboard = () => {
-  const { people, departments, websites, applications } = useData();
+  const { data: people = [] } = trpc.people.list.useQuery();
+  const { data: departments = [] } = trpc.departments.list.useQuery();
+  const { data: websites = [] } = trpc.websites.list.useQuery();
+  const { data: applications = [] } = trpc.applications.list.useQuery();
   const [, setLocation] = useLocation();
 
   // Calculate metrics
@@ -34,35 +37,35 @@ const Dashboard = () => {
 
       {/* Key Metrics Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <DataCard 
-          title="Total People" 
-          value={totalPeople} 
+        <DataCard
+          title="Total People"
+          value={totalPeople}
           icon={Users}
           trend={{ value: 12, isPositive: true }}
           description="Active personnel"
           color="text-blue-500"
           onClick={() => setLocation('/people')}
         />
-        <DataCard 
-          title="Departments" 
-          value={totalDepartments} 
+        <DataCard
+          title="Departments"
+          value={totalDepartments}
           icon={Building2}
           description="Across organization"
           color="text-orange-500"
           onClick={() => setLocation('/departments')}
         />
-        <DataCard 
-          title="Websites" 
-          value={totalWebsites} 
+        <DataCard
+          title="Websites"
+          value={totalWebsites}
           icon={Globe}
           trend={{ value: 2, isPositive: true }}
           description="Public & Internal"
           color="text-emerald-500"
           onClick={() => setLocation('/websites')}
         />
-        <DataCard 
-          title="Applications" 
-          value={totalApps} 
+        <DataCard
+          title="Applications"
+          value={totalApps}
           icon={AppWindow}
           description="Managed software"
           color="text-violet-500"
@@ -78,25 +81,25 @@ const Dashboard = () => {
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#888888" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
+                <XAxis
+                  dataKey="name"
+                  stroke="#888888"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
                 />
-                <YAxis 
-                  stroke="#888888" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
-                  tickFormatter={(value) => `${value}`} 
+                <YAxis
+                  stroke="#888888"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${value}`}
                 />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: 'rgba(255,255,255,0.1)' }}
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255,255,255,0.9)', 
-                    borderRadius: '8px', 
+                  contentStyle={{
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    borderRadius: '8px',
                     border: 'none',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                   }}

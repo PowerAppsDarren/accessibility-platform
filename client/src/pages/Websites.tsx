@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
-import { useData } from '@/contexts/DataContext';
-import { Website } from '@/types/schema';
+import { useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Website } from '../../../drizzle/schema';
+
+type WebsiteForm = Omit<Website, 'lastContactDate' | 'createdAt' | 'updatedAt'> & {
+  lastContactDate?: string;
+};
+
 import { DataTable } from '@/components/DataTable';
 import RecordDialog from '@/components/RecordDialog';
 import { Button } from '@/components/ui/button';
@@ -13,21 +18,29 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
 const Websites = () => {
-  const { websites, departments, people, addWebsite, updateWebsite, deleteWebsite } = useData();
+  const { data: websites = [], isLoading, refetch } = trpc.websites.list.useQuery();
+  const { data: departments = [] } = trpc.departments.list.useQuery();
+  const { data: people = [] } = trpc.people.list.useQuery();
+  const createMutation = trpc.websites.create.useMutation();
+  const updateMutation = trpc.websites.update.useMutation();
+  const deleteMutation = trpc.websites.delete.useMutation();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentWebsite, setCurrentWebsite] = useState<Partial<Website>>({});
+  const [currentWebsite, setCurrentWebsite] = useState<Partial<WebsiteForm>>({});
   const [isEditing, setIsEditing] = useState(false);
 
-  const filteredWebsites = websites.filter(site => 
+  const filteredWebsites = websites.filter(site =>
     (site.url || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (site.owner || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (() => {
+      const owner = people.find(p => p.id === site.ownerId);
+      return owner ? `${owner.firstName} ${owner.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) : false;
+    })()
   );
 
   const handleAdd = () => {
     setCurrentWebsite({
       url: '',
-      owner: '',
       departmentId: departments[0]?.id,
       lastContactDate: new Date().toISOString().split('T')[0],
       archived: false,
@@ -40,44 +53,87 @@ const Websites = () => {
   };
 
   const handleEdit = (site: Website) => {
-    setCurrentWebsite({ ...site });
+    const formSite: Partial<WebsiteForm> = {
+      ...site,
+      lastContactDate: site.lastContactDate ? new Date(site.lastContactDate).toISOString().split('T')[0] : undefined
+    };
+    setCurrentWebsite(formSite);
     setIsEditing(true);
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!currentWebsite.url || !currentWebsite.departmentId) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    if (isEditing && currentWebsite.id) {
-      updateWebsite(currentWebsite.id, currentWebsite);
-      toast.success('Website updated successfully');
-    } else {
-      addWebsite(currentWebsite as Omit<Website, 'id'>);
-      toast.success('Website added successfully');
+    try {
+      if (isEditing && currentWebsite.id) {
+        await updateMutation.mutateAsync({
+          id: currentWebsite.id,
+          url: currentWebsite.url,
+          departmentId: currentWebsite.departmentId,
+          contactId: currentWebsite.contactId || undefined,
+          managerId: currentWebsite.managerId || undefined,
+          lastContactDate: currentWebsite.lastContactDate || undefined,
+          ownerId: currentWebsite.ownerId || undefined,
+          archived: currentWebsite.archived ?? false,
+          accessibilityReviewed: currentWebsite.accessibilityReviewed ?? false,
+          siteimproveScore: currentWebsite.siteimproveScore ?? undefined,
+          manualReview: currentWebsite.manualReview ?? false,
+          remediationPlan: currentWebsite.remediationPlan || undefined,
+          notes: currentWebsite.notes || undefined
+        });
+        toast.success('Website updated successfully');
+      } else {
+        await createMutation.mutateAsync({
+          url: currentWebsite.url,
+          departmentId: currentWebsite.departmentId,
+          contactId: currentWebsite.contactId || undefined,
+          managerId: currentWebsite.managerId || undefined,
+          lastContactDate: currentWebsite.lastContactDate || undefined,
+          ownerId: currentWebsite.ownerId || undefined,
+          archived: currentWebsite.archived ?? false,
+          accessibilityReviewed: currentWebsite.accessibilityReviewed ?? false,
+          siteimproveScore: currentWebsite.siteimproveScore ?? undefined,
+          manualReview: currentWebsite.manualReview ?? false,
+          remediationPlan: currentWebsite.remediationPlan || undefined,
+          notes: currentWebsite.notes || undefined
+        });
+        toast.success('Website added successfully');
+      }
+      refetch();
+      setIsDialogOpen(false);
+    } catch (error) {
+      toast.error('Failed to save website');
+      console.error(error);
     }
-    setIsDialogOpen(false);
   };
 
-  const handleDelete = () => {
-    if (currentWebsite.id) {
-      deleteWebsite(currentWebsite.id);
+  const handleDelete = async () => {
+    if (!currentWebsite.id) return;
+
+    try {
+      await deleteMutation.mutateAsync({ id: currentWebsite.id });
       toast.success('Website deleted successfully');
+      refetch();
       setIsDialogOpen(false);
+    } catch (error) {
+      toast.error('Failed to delete website');
+      console.error(error);
     }
   };
 
   const columns = [
     { header: 'ID', accessorKey: 'id' as keyof Website, className: 'w-[60px]' },
-    { 
-      header: 'URL', 
+    {
+      header: 'URL',
       cell: (site: Website) => (
-        <a 
-          href={site.url} 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <a
+          href={site.url || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
           className="flex items-center gap-2 text-primary hover:underline font-medium"
           onClick={(e) => e.stopPropagation()}
         >
@@ -86,26 +142,32 @@ const Websites = () => {
         </a>
       )
     },
-    { header: 'Owner', accessorKey: 'owner' as keyof Website },
-    { 
-      header: 'Score', 
+    {
+      header: 'Owner',
+      cell: (site: Website) => {
+        const owner = people.find(p => p.id === site.ownerId);
+        return owner ? `${owner.firstName} ${owner.lastName}` : '-';
+      }
+    },
+    {
+      header: 'Score',
       cell: (site: Website) => (
         <div className="flex items-center gap-2">
           <div className="w-16 bg-secondary rounded-full h-2 overflow-hidden">
-            <div 
+            <div
               className={`h-full ${
-                (site.siteimproveScore || 0) >= 90 ? 'bg-green-500' : 
+                (site.siteimproveScore || 0) >= 90 ? 'bg-green-500' :
                 (site.siteimproveScore || 0) >= 70 ? 'bg-yellow-500' : 'bg-red-500'
-              }`} 
-              style={{ width: `${site.siteimproveScore}%` }}
+              }`}
+              style={{ width: `${site.siteimproveScore || 0}%` }}
             />
           </div>
-          <span className="text-xs font-mono">{site.siteimproveScore}</span>
+          <span className="text-xs font-mono">{site.siteimproveScore ?? 0}</span>
         </div>
       )
     },
-    { 
-      header: 'Review Status', 
+    {
+      header: 'Review Status',
       cell: (site: Website) => (
         <div className="flex gap-2">
           {site.accessibilityReviewed ? (
@@ -119,8 +181,8 @@ const Websites = () => {
         </div>
       )
     },
-    { 
-      header: 'Status', 
+    {
+      header: 'Status',
       cell: (site: Website) => (
         <span className={`px-2 py-1 rounded-full text-xs ${site.archived ? 'bg-gray-200 text-gray-700' : 'bg-green-100 text-green-700'}`}>
           {site.archived ? 'Archived' : 'Active'}
@@ -128,6 +190,10 @@ const Websites = () => {
       )
     },
   ];
+
+  if (isLoading) {
+    return <div className="p-6">Loading...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -144,7 +210,7 @@ const Websites = () => {
 
       <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm p-2 rounded-lg border border-white/20 shadow-sm max-w-md">
         <Search className="h-4 w-4 text-muted-foreground ml-2" />
-        <input 
+        <input
           type="text"
           placeholder="Search websites..."
           className="bg-transparent border-none focus:outline-none text-sm w-full"
@@ -153,7 +219,7 @@ const Websites = () => {
         />
       </div>
 
-      <DataTable 
+      <DataTable
         data={filteredWebsites}
         columns={columns}
         onRowClick={handleEdit}
@@ -165,15 +231,15 @@ const Websites = () => {
         title={isEditing ? "Edit Website" : "Add Website"}
         description={isEditing ? "Update website details." : "Add a new website to the system."}
         onSave={handleSave}
-        onDelete={handleDelete}
+        onDelete={isEditing ? handleDelete : undefined}
         isEditing={isEditing}
       >
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="url">URL *</Label>
-            <Input 
-              id="url" 
-              value={currentWebsite.url || ''} 
+            <Input
+              id="url"
+              value={currentWebsite.url || ''}
               onChange={(e) => setCurrentWebsite({...currentWebsite, url: e.target.value})}
             />
           </div>
@@ -181,8 +247,8 @@ const Websites = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="department">Department *</Label>
-              <Select 
-                value={currentWebsite.departmentId?.toString()} 
+              <Select
+                value={currentWebsite.departmentId?.toString()}
                 onValueChange={(val) => setCurrentWebsite({...currentWebsite, departmentId: parseInt(val)})}
               >
                 <SelectTrigger>
@@ -197,19 +263,29 @@ const Websites = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="owner">Owner</Label>
-              <Input 
-                id="owner" 
-                value={currentWebsite.owner || ''} 
-                onChange={(e) => setCurrentWebsite({...currentWebsite, owner: e.target.value})}
-              />
+              <Select
+                value={currentWebsite.ownerId?.toString()}
+                onValueChange={(val) => setCurrentWebsite({...currentWebsite, ownerId: parseInt(val)})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select owner" />
+                </SelectTrigger>
+                <SelectContent>
+                  {people.map(person => (
+                    <SelectItem key={person.id} value={person.id.toString()}>
+                      {person.firstName} {person.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="contact">Contact Person</Label>
-              <Select 
-                value={currentWebsite.contactId?.toString()} 
+              <Select
+                value={currentWebsite.contactId?.toString()}
                 onValueChange={(val) => setCurrentWebsite({...currentWebsite, contactId: parseInt(val)})}
               >
                 <SelectTrigger>
@@ -226,8 +302,8 @@ const Websites = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="manager">Manager</Label>
-              <Select 
-                value={currentWebsite.managerId?.toString()} 
+              <Select
+                value={currentWebsite.managerId?.toString()}
                 onValueChange={(val) => setCurrentWebsite({...currentWebsite, managerId: parseInt(val)})}
               >
                 <SelectTrigger>
@@ -247,21 +323,21 @@ const Websites = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="score">Siteimprove Score</Label>
-              <Input 
-                id="score" 
+              <Input
+                id="score"
                 type="number"
                 min="0"
                 max="100"
-                value={currentWebsite.siteimproveScore || 0} 
+                value={currentWebsite.siteimproveScore ?? 0}
                 onChange={(e) => setCurrentWebsite({...currentWebsite, siteimproveScore: parseInt(e.target.value)})}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastContact">Last Contact Date</Label>
-              <Input 
-                id="lastContact" 
+              <Input
+                id="lastContact"
                 type="date"
-                value={currentWebsite.lastContactDate || ''} 
+                value={currentWebsite.lastContactDate || ''}
                 onChange={(e) => setCurrentWebsite({...currentWebsite, lastContactDate: e.target.value})}
               />
             </div>
@@ -269,27 +345,36 @@ const Websites = () => {
 
           <div className="flex items-center justify-between p-2 border rounded-lg">
             <Label htmlFor="archived" className="cursor-pointer">Archived</Label>
-            <Switch 
-              id="archived" 
-              checked={currentWebsite.archived}
+            <Switch
+              id="archived"
+              checked={currentWebsite.archived ?? false}
               onCheckedChange={(checked) => setCurrentWebsite({...currentWebsite, archived: checked})}
             />
           </div>
 
           <div className="flex items-center justify-between p-2 border rounded-lg">
             <Label htmlFor="accessibilityReviewed" className="cursor-pointer">Accessibility Reviewed</Label>
-            <Switch 
-              id="accessibilityReviewed" 
-              checked={currentWebsite.accessibilityReviewed}
+            <Switch
+              id="accessibilityReviewed"
+              checked={currentWebsite.accessibilityReviewed ?? false}
               onCheckedChange={(checked) => setCurrentWebsite({...currentWebsite, accessibilityReviewed: checked})}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-2 border rounded-lg">
+            <Label htmlFor="manualReview" className="cursor-pointer">Manual Review</Label>
+            <Switch
+              id="manualReview"
+              checked={currentWebsite.manualReview ?? false}
+              onCheckedChange={(checked) => setCurrentWebsite({...currentWebsite, manualReview: checked})}
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
-            <Input 
-              id="notes" 
-              value={currentWebsite.notes || ''} 
+            <Input
+              id="notes"
+              value={currentWebsite.notes || ''}
               onChange={(e) => setCurrentWebsite({...currentWebsite, notes: e.target.value})}
             />
           </div>
